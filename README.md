@@ -1,7 +1,3 @@
----
-lang: en
----
-
 # Low power Projects
 Low power digital systems design projects
 
