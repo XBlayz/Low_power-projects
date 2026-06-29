@@ -56,20 +56,20 @@ Using the definition formula ($\gamma_D = \frac{S_{load}}{S} \frac{\tau_0}{\Delt
 > _Note_: $\tau_0$ is determined during `STEP 1: Minimum Inverter Sizing`.
 
 ## STEP 3: Energy-Delay simulated optimal curve
-#TODO: STEP 3 (Energy-Delay simulated optimal curve)
+TODO: STEP 3 (Energy-Delay simulated optimal curve)
 
 ## STEP 4: Energy-Delay optimal curve from theoretical model
-#TODO: STEP 4 (Energy-Delay optimal curve from theoretical model)
+TODO: STEP 4 (Energy-Delay optimal curve from theoretical model)
 
 ## STEP 5: Theoretical model results verification
-#TODO: STEP 5 (Theoretical model results verification)
+TODO: STEP 5 (Theoretical model results verification)
 
 ---
 
 # Project 02
-#TODO: Project 02
+TODO: Project 02
 
 ---
 
 # Project 03
-#TODO: Project 03
+TODO: Project 03
