@@ -56,13 +56,48 @@ Using the definition formula ($\gamma_D = \frac{S_{load}}{S} \frac{\tau_0}{\Delt
 > _Note_: $\tau_0$ is determined during `STEP 1: Minimum Inverter Sizing`.
 
 ## STEP 3: Energy-Delay simulated optimal curve
-TODO: STEP 3 (Energy-Delay simulated optimal curve)
+For deriving the **empirical Pareto curve**, we need to explore the _design space_ defined by the scaling factors of the second and third inverter ($S_2$ and $S_3$) and identify the **envelope** of minimum energy points for each delay value.
+
+The exploration is performed via a **Monte Carlo simulation** in _LTspice_, sweeping $S_2$ and $S_3$ as _random variables_ over a range covering both `low-power` and `high-performance` configurations, while keeping the final load fixed at `50x` the minimum inverter (as defined in the _design constraints_).
+
+For each _run_, the **energy** dissipated by the buffer and the **total propagation delay** are measured, generating a _cloud of design points_ in the energy-delay plane. From this cloud, the **Pareto frontier** is extracted by selecting, for each delay bin, the point with _minimum energy_, discarding all _dominated_ points (i.e. points for which another configuration exists with both lower energy and lower delay).
+
+> _Note_: the **energy** is measured using the same approach described in `STEP 2: Model Calibration` (integrating $V_{DD} \cdot I(t)$ over the switching transient), while the **delay** is the sum of the propagation delays of the _three stages_.
+
+From this step we determinate:
+- **Empirical Pareto curve**: the set of $(D, E)$ points constituting the _envelope_ of the Monte Carlo simulation, used as _reference_ for validating the theoretical model in `STEP 5`.
 
 ## STEP 4: Energy-Delay optimal curve from theoretical model
-TODO: STEP 4 (Energy-Delay optimal curve from theoretical model)
+For deriving the **theoretical Pareto curve**, we use the **energy and delay models** calibrated in `STEP 2: Model Calibration`, applying the **sensitivity analysis methodology** through a _numerical optimization tool_.
+
+The **delay model** for the three-stage buffer is expressed as:
+
+$$D(S_2, S_3) = \tau_0 \left(1 + \frac{1}{\gamma_D} S_2\right) + \tau_0 \left(1 + \frac{1}{\gamma_D} \frac{S_3}{S_2}\right) + \tau_0 \left(1 + \frac{1}{\gamma_D} \frac{50}{S_3}\right)$$
+
+The **energy model** for the three-stage buffer is expressed as:
+
+$$E = V_{DD}^2 \left[\gamma_E C_{in,0} + S_2 C_{in,0} + \gamma_E S_2 C_{in,0} + S_3 C_{in,0} + \gamma_E S_3 C_{in,0} + C_L\right]$$
+
+where $C_L$ is the **capacitive load** of the last stage ($50 \times C_{in,0}$).
+
+The **optimization** is performed by _minimizing_ the dynamic **energy** dissipation subject to a fixed **delay constraint** ($D(S_2, S_3) = D_{target}$), repeating the procedure for an appropriate set of _delay constraints_ spanning the range of interest. For each constraint, a pair of optimal sizings $(S_2, S_3)$ is obtained.
+
+> _Note_: the optimization is performed using a **constrained nonlinear solver** (e.g. _Python_ optimizer such as `scipy.optimize.minimize` with the `SLSQP` method), since the **delay constraint** is _nonlinear_ in $S_2$ and $S_3$.
+
+From this step we determinate:
+- **Theoretical Pareto curve**: the set of $(S_2, S_3)$ pairs minimizing energy for each delay constraint, together with the corresponding $(D, E)$ points computed via the _calibrated models_.
 
 ## STEP 5: Theoretical model results verification
-TODO: STEP 5 (Theoretical model results verification)
+For **validating** the theoretical model, each pair $(S_2, S_3)$ obtained in `STEP 4` is used to configure the _three-stage buffer_ in **LTspice**, simulating the _actual_ energy and delay for that specific sizing.
+
+The set of $(D, E)$ points obtained from these simulations constitutes the **Pareto curve derived via sensitivity analysis**, which is then compared against the **empirical Pareto curve** derived in `STEP 3` to assess whether the two curves _substantially coincide_.
+
+The comparison focuses on:
+- **Convexity**: verifying that both curves exhibit the same _qualitative trend_ in the energy-delay trade-off.
+- **Quantitative offset**: any systematic _deviation_ between the curves (e.g. the theoretical model underestimating the dissipated energy) is attributed to the _accuracy_ of the analytical model (in particular, the _approximations_ introduced by the linear $C_{in} \propto W$ and $C_d \propto W$ relations).
+
+From this step we determinate:
+- **Model validation**: confirmation that, despite possible _quantitative offsets_, the theoretical model correctly identifies the _optimal trade-offs_ between energy and delay, making it a _reliable tool_ for the **sensitivity analysis methodology**.
 
 ---
 
