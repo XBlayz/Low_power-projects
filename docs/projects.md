@@ -99,12 +99,86 @@ The comparison focuses on:
 From this step we determinate:
 - **Model validation**: confirmation that, despite possible _quantitative offsets_, the theoretical model correctly identifies the _optimal trade-offs_ between energy and delay, making it a _reliable tool_ for the **sensitivity analysis methodology**.
 
+
 ---
+
 
 # Project 02
-TODO: Project 02
+Noise Margin Analysis of a 6T SRAM Cell
+
+## STEP 1: Cell Sizing (Cell Ratio & Pull-up Ratio)
+I size the **access**, **pull-down**, and **pull-up** transistors of the 6T SRAM cell (two cross-coupled CMOS inverters plus two NMOS access transistors) by applying the **Cell Ratio** ($CR$) and **Pull-up Ratio** ($PR$) design rules.
+
+$$CR = \frac{W_{pdn}/L_{pdn}}{W_{ax}/L_{ax}} \qquad PR = \frac{W_{pu}/L_{pu}}{W_{ax}/L_{ax}}$$
+
+To guarantee a robust **READ** ($CR > 1$) and a robust **WRITE** ($PR < 1$) at equal channel length, the sizing must satisfy $W_{pdn} > W_{ax} > W_{pu}$. The starting point is the technology's minimum width $W_{min}$, with $W_{ax} = W_{pu} = W_{min}$ and $W_{pdn} = 1.5 \cdot W_{min}$ as the nominal reference (from the _colleague's report_).
+
+Starting from this nominal point, $W_{pdn}$ is **swept** via a parametric LTspice simulation (`.step param pd ...`, with $W_{pdn} = pd \cdot W_{min}$) while $W_{ax}$ and $W_{pu}$ are kept at $W_{min}$. For each step, the **VTC** of the two cross-coupled inverters is exported and used to extract the **butterfly curve** and its inscribed square (**graphical SNM method**) in HOLD and READ.
+
+$W_{pdn}$ is increased until the **READ SNM** (the more critical of the two) reaches the target robustness threshold (`150mV`), while avoiding unnecessary area overhead from oversizing. The final sizing determines the corresponding $CR$ and $PR$ values.
+
+From this step we determinate:
+- **Final transistor sizing**: $W_{ax}$, $W_{pu}$, $W_{pdn}$ (with $L = L_{min}$ for all devices)
+- **Cell Ratio** ($CR$) and **Pull-up Ratio** ($PR$) at the chosen sizing
+
+## STEP 2: Seevinck Method Validation
+For **validating** the graphical SNM extraction method against a scalable, LTspice-native alternative, I implement the **Seevinck method**, which computes the SNM directly via a coordinate rotation without requiring external post-processing of exported curves.
+
+Applying the change of coordinates:
+
+$$x = \frac{1}{\sqrt{2}}u + \frac{1}{\sqrt{2}}v \qquad y = -\frac{1}{\sqrt{2}}u + \frac{1}{\sqrt{2}}v$$
+
+the two VTC curves ($F_1$, $F_2$) are combined into implicit relations in the rotated $(u, v)$ plane. The `.dc` sweep in $u$ then produces a curve whose **local maximum**, for each lobe of the butterfly curve, corresponds to the **diagonal** of the largest inscribed square; the SNM is obtained by multiplying this diagonal by $\cos(45°)$.
+
+This is implemented as a dedicated LTspice schematic (mirroring the two inverters through the coordinate-transformed dependent sources) and run for the **final sizing** from `STEP 1`, for both HOLD and READ, to cross-check against the graphical method.
+
+> _Note_: this schematic is the one reused for all subsequent Monte Carlo analyses in `STEP 3` and `STEP 4`, since it yields the SNM as a single scalar measurement per run — required for statistical post-processing.
+
+From this step we determinate:
+- **HSNM, RSNM** (Seevinck method): cross-check values against `STEP 1`'s graphical extraction
+
+## STEP 3: Inter-die Process Variation (Monte Carlo)
+For characterizing the impact of **inter-die** process variation — a _global_, uniform shift of the threshold voltage affecting all devices on the same die identically — I run a **Monte Carlo** analysis in LTspice on the Seevinck-method schematic from `STEP 2`, using a Gaussian $V_{TH}$ model where **all transistors share the same random variable**.
+
+The analysis is repeated for a **VDD sweep** (from `1.0V` down to `0.4V` in fixed `0.1V` steps), with `2500` MC runs at each voltage step. At each step, the following quantities are measured and their **mean** and **variance** tabulated:
+- **Leakage power** (static power dissipation)
+- **HSNM** (HOLD static noise margin)
+- **RSNM** (READ static noise margin)
+
+The corresponding **probability distributions** are plotted for each VDD step to observe how they evolve (from approximately Gaussian at nominal VDD towards a **log-normal** shape at reduced VDD).
+
+From this step we determinate:
+- **Inter-die statistics**: mean/variance of leakage, HSNM, RSNM vs. VDD
+- **Inter-die DRV distribution**: histogram of the per-run minimum retention voltage
+
+## STEP 4: Intra-die Process Variation (Monte Carlo)
+For characterizing the impact of **intra-die** process variation — _local_ mismatch that makes nominally identical transistors electrically different, breaking the symmetry of the cross-coupled inverter pair — I repeat the Monte Carlo analysis from `STEP 3` on the same Seevinck-method schematic, but with an **independent** Gaussian $V_{TH}$ random variable assigned to **each transistor** individually.
+
+The same `1.0V`–`0.4V` **VDD sweep** and `2500`-run MC procedure are applied, tabulating mean and variance of **leakage power**, **HSNM**, and **RSNM** at each voltage step, together with the corresponding probability distributions.
+
+From this step we determinate:
+- **Intra-die statistics**: mean/variance of leakage, HSNM, RSNM vs. VDD
+- **Intra-die DRV distribution**: histogram of the per-run minimum retention voltage
+
+## STEP 5: Comparative Analysis and DRV
+For **assessing the relative severity** of the two mismatch sources, the inter-die (`STEP 3`) and intra-die (`STEP 4`) results are compared directly:
+
+- **SNM degradation**: percentage variation of HSNM and RSNM at nominal VDD (`1.0V`) when moving from inter-die (global) to intra-die (local) variation.
+- **VDD scaling trend**: for both variation types, HSNM and RSNM degrade monotonically as VDD is reduced, with READ consistently more critical than HOLD (lower absolute margin at every VDD step).
+- **Leakage power trend**: mean leakage decreases monotonically with VDD, as expected from the exponential dependence of subthreshold current on $V_{DS}$.
+- **DRV (Data Retention Voltage)**: for each MC run, the minimum VDD at which the cell still retains its stored value is extracted; the resulting distribution (log-normal, right-skewed) identifies the weakest cells in the population and their required retention voltage.
+
+The comparison focuses on:
+- **Distribution shape**: whether SNM distributions remain Gaussian or drift towards **log-normal** as VDD decreases, and whether intra-die variation produces a **wider, right-shifted** DRV distribution compared to inter-die.
+- **Design implication**: quantifying how much more conservative the sizing from `STEP 1` should be to guarantee robustness under intra-die mismatch, which is the more severe (and more physically realistic) variation source.
+
+From this step we determinate:
+- **Comparative degradation table**: inter-die vs. intra-die HSNM/RSNM percentage variation at nominal VDD
+- **DRV comparison**: inter-die vs. intra-die DRV distribution shift and spread
+
 
 ---
+
 
 # Project 03
 TODO: Project 03
