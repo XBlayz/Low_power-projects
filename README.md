@@ -25,8 +25,23 @@ The objective of this project is the application of the sensitivity analysis met
 Using a numerical optimization tool and the energy and delay models mentioned above, derive the aspect ratios that minimize dynamic energy dissipation for an appropriate set of delay constraints. In this way, for each delay constraint analyzed, a pair of sizings will be obtained, e.g., $(W_1, W_2)$.
 5. For each of the pairs found in the previous step, simulate the buffer with **LTSPICE** to derive the actual corresponding design points in the energy-delay space. The set of these points constitutes the optimal Pareto curve derived via sensitivity analysis. Verify that this curve substantially coincides with the curve derived empirically.
 
-### Project 02: ...
-TODO
+### Project 02: Noise Margin Analysis of a 6T SRAM Cell
+The objective of this project is the design and stability characterization of a 6T SRAM cell, evaluating its robustness against process variation through Static Noise Margin (SNM) analysis.
+
+#### Design Constraints
+1. The cell must use the standard `6T` topology: two cross-coupled CMOS inverters plus two NMOS access transistors
+2. The supply voltage for the nominal sizing is `1V`
+3. The access and pull-up transistors are sized at the technology's minimum width (`W_min`); the pull-down width is the free sizing variable
+4. The sizing must satisfy `W_pdn > W_ax > W_pu` to guarantee both READ (`CR > 1`) and WRITE (`PR < 1`) robustness
+
+#### Tasks to Perform
+*(Based on personal considerations and following simulations performed with a specific simulation setup)*
+
+1. Size the pull-down transistor via the graphical butterfly-curve method, targeting a READ SNM of `150mV` in HOLD and READ conditions.
+2. Validate the graphical extraction against the **Seevinck method**, which computes SNM directly from an LTspice `.dc` sweep via a coordinate rotation, removing the need for external post-processing.
+3. Assess **inter-die** process variation: run a Monte Carlo analysis with a threshold-voltage mismatch shared by every transistor, sweeping VDD and tabulating leakage power, HSNM, and RSNM statistics at each step.
+4. Assess **intra-die** process variation: repeat the Monte Carlo analysis with an independent threshold-voltage mismatch per transistor, to capture the effect of local device mismatch on cell symmetry.
+5. Compare the inter-die and intra-die results, quantifying the SNM degradation and the shift in Data Retention Voltage (DRV) distribution caused by local mismatch.
 
 ### Project 03: ...
 TODO
