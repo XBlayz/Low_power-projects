@@ -95,7 +95,7 @@
 *-----------------------------------------------------------------------
 *4-4-2013  LTSPICE uses Level=8
 * From Electronics II EEEE482 FOR ~100nm Technology
-.model EECMOSN	NMOS (LEVEL=8
+.model EECMOSN_1	NMOS (LEVEL=8
 +VERSION=3.1 CAPMOD=2 MOBMOD=1
 +TOX=5E-9 XJ=1.84E-7 NCH=1E17 NSUB=5E16 XT=5E-8
 +VTH0={0.4+gauss(0.04)} U0= 200 WINT=1E-8 LINT=1E-8
@@ -132,7 +132,7 @@
 *
 *4-4-2013  LTSPICE uses Level=8
 * From Electronics II EEEE482 FOR ~100nm Technology
-.model EECMOSP	PMOS (LEVEL=8
+.model EECMOSP2	PMOS (LEVEL=8
 +TOX=5E-9 XJ=0.05E-6 NCH=1E17 NSUB=5E16 XT=5E-8
 +VTH0={-1*(0.4+gauss(0.04))} U0= 100 WINT=1E-8 LINT=1E-8
 +NGATE=5E20 RSH=1000 JS=3.51E-8 JSW=3.51E-8 CJ=5.28E-4 MJ=0.5 PB=0.94
