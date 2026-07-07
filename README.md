@@ -43,5 +43,23 @@ The objective of this project is the design and stability characterization of a 
 4. Assess **intra-die** process variation: repeat the Monte Carlo analysis with an independent threshold-voltage mismatch per transistor, to capture the effect of local device mismatch on cell symmetry.
 5. Compare the inter-die and intra-die results, quantifying the SNM degradation and the shift in Data Retention Voltage (DRV) distribution caused by local mismatch.
 
-### Project 03: ...
-TODO
+### Project 03: Dynamic Power Optimization of a Synthesized RTL Circuit
+The objective of this project is the application of Registering and Reordering low-power techniques to reduce the dynamic power dissipation of a synthesized RTL circuit, replicating the reference design and methodology of Christian Pitingolo (*Progetto Low-Power - 3*, December 2025).
+
+#### Reference Circuit
+The reference circuit performs a 32-bit addition between two of four available operands (`A`, `B`, `C`, `D`), selected via two multiplexers (`MUX_CD` and `MUX_AB`) sharing a common selection signal `Z`. `Z` is the output of a `parity_check` block (XOR tree) fed by the 8-bit sum of two selection signals `sel1` and `sel2`, computed by an 8-bit Ripple Carry Adder (`RCA8`). When the sum `sel1 + sel2` is odd (`Z = 1`), operands `A` and `C` are selected and summed by a 32-bit Ripple Carry Adder (`RCA32`); when even (`Z = 0`), operands `B` and `D` are selected instead. The result is registered on a 33-bit output register (`Z_reg`).
+
+#### Design Constraints
+1. The RTL is described in `VHDL` and targets an FPGA device via `Vivado` (synthesis + implementation)
+2. The functional behavior of the reference circuit must be preserved by every optimized variant (bit-exact addition result and selection logic)
+3. The clock constraint is fixed per comparison campaign (`10ns` for the standard campaign, a tighter constraint for the high-performance campaign)
+4. Dynamic power is analyzed excluding I/O contributions, using the Vivado Power Report (`Logic`, `Signals`, `Clock` breakdown)
+#### Tasks to Perform
+*(Based on personal considerations, replicating the reference methodology and simulations)*
+
+1. Implement the baseline reference circuit in `VHDL` and verify it with a Behavioral simulation testbench (functional correctness of the `A+C` / `B+D` selection logic).
+2. Run Post-implementation (post-P&R) simulation on the baseline to characterize the glitch behavior on the multiplexer selection signal, and extract the baseline resource usage, timing (WNS, `fmax`), and dynamic power report.
+3. Apply the **Registering** technique: insert an intermediate pipeline stage for the data path and the multiplexer selection signal (`sel_1_2`), removing the combinational glitch at the mux select input. Re-run Behavioral and Post-implementation simulations and extract the corresponding resource usage, timing, and dynamic power report.
+4. Apply the **Reordering** technique: restructure the topology using two dedicated 32-bit adders (`Adder32AC`, `Adder32BD`) computing both `A+C` and `B+D` in parallel, selecting the correct sum a posteriori via a result multiplexer (`MUX_SUM`) driven by the `parity_check` output. Re-run Post-implementation simulation and extract the corresponding resource usage, timing, and dynamic power report.
+5. Apply the **combined** Registering + Reordering architecture (pipelined dual-adder topology with registered selection signal). Re-run Post-implementation simulation and extract the corresponding resource usage, timing, and dynamic power report.
+6. Compare all four configurations (Baseline, Registering, Reordering, Registering & Reordering) under both the standard clock constraint and a tighter, high-performance clock constraint, and validate the results against the reference figures (LUT/FF count, WNS, `fmax`, Logic/Signals/Clock power).
