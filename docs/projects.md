@@ -181,4 +181,75 @@ From this step we determinate:
 
 
 # Project 03
-TODO: Project 03
+Dynamic Power Optimization of a Synthesized RTL Circuit
+
+## Reference
+This project replicates the circuit, techniques, and comparison methodology presented by Christian Pitingolo in *Progetto Low-Power - 3* (December 2025). The **reference circuit** is a 32-bit adder that selects between two operand pairs (`A,C` or `B,D`) via a parity-based control path (`sel1`, `sel2` → `RCA8` → `parity_check` → `Z`), driving two multiplexers (`MUX_AB`, `MUX_CD`) that feed a 32-bit Ripple Carry Adder (`RCA32`), with a registered 33-bit output (`Z_reg`).
+
+Four architectural variants are implemented and compared, all functionally equivalent to the reference:
+- **Baseline**: direct translation of the reference schematic.
+- **Registering**: an intermediate pipeline stage is inserted for the operand registers and for the multiplexer selection signal (`sel_1_2_reg`), so both `MUX_AB` and `MUX_CD` receive a stable, glitch-free select line.
+- **Reordering**: the topology is restructured with two dedicated 32-bit adders (`Adder32AC`, `Adder32BD`) computing `A+C` and `B+D` in parallel; the correct sum is selected a posteriori via `MUX_SUM`, driven by `parity_check`.
+- **Registering & Reordering**: the Reordering topology with the selection signal and dual-adder outputs registered, combining both techniques.
+## STEP 1: Baseline RTL Implementation and Functional Verification
+I implement the **reference circuit** in `VHDL`: a 33-bit output register, an `RCA32` adder, two data multiplexers (`MUX_AB`, `MUX_CD`), an `RCA8` adder, and a `parity_check` (XOR-tree) block generating the shared selection signal `Z`.
+
+The circuit is verified with a **Behavioral simulation** testbench, driving `A`, `B`, `C`, `D`, `sel1`, `sel2` with pseudo-random 32-bit/8-bit stimuli and checking both:
+- the correct commutation of `Z` (`Z = 1` ⇒ `sel1 + sel2` odd ⇒ operands `A,C` selected; `Z = 0` ⇒ operands `B,D` selected);
+- the correctness of the summation result on `Z_reg` at the clock edge following selection.
+From this step we determinate:
+- **Baseline VHDL sources**: reference RTL description, functionally verified against the expected `A+C` / `B+D` selection behavior.
+## STEP 2: Baseline Synthesis, Implementation, and Power Characterization
+I synthesize and implement the baseline design in **Vivado**, targeting the same clock constraint used in the reference (`10ns`).
+
+A **Post-implementation (post-P&R) simulation** is run on the implemented netlist, reproducing the same stimuli used in `STEP 1`, to observe the _glitch_ behavior on the multiplexer selection signal (`sel_1`) caused by the unregistered combinational path from `sel1`/`sel2` through `RCA8` and `parity_check`.
+
+From the Vivado reports, I extract:
+- **Resource usage**: LUT count, FF count.
+- **Timing**: Worst Negative Slack (`WNS`), maximum operating frequency (`fmax`).
+- **Dynamic power breakdown** (I/O excluded): `Logic`, `Signals`/`Data`, `Clock` power, and total internal power.
+> _Note_: the power report is derived from a `.saif` activity file generated from the post-implementation simulation, from which Vivado estimates the switching factor $\alpha$ per net.
+
+From this step we determinate:
+- **Baseline reference metrics**: `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)`, used as the comparison anchor for every optimized variant.
+## STEP 3: Registering Technique
+I implement the **Registering** variant: an intermediate Flip-Flop stage is inserted for the `A`, `B`, `C`, `D` operand registers and for the multiplexer selection signal, producing a stable, registered select line (`sel_1_2_reg`) for both `MUX_AB` and `MUX_CD`. This removes the possibility of transient, non-valid operand pairs reaching the `RCA32` adder input.
+
+I repeat the same verification flow as `STEP 1`-`STEP 2`:
+- **Behavioral simulation**: verify the increased pipeline latency and the correct sampling sequence across the additional register stage.
+- **Post-implementation simulation**: verify functional correctness under real timing and inspect the residual glitch behavior on `sel_1` (expected to settle well before the next active clock edge).
+- **Synthesis/implementation reports**: extract `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` under the same `10ns` clock constraint.
+> _Note_: the dynamic power reduction from Registering is expected to stem primarily from a reduced switching factor $\alpha$ (fewer spurious transitions on the `RCA32` inputs and on the adder's internal nodes), at the cost of an increased FF count and a small increase in clock-network power.
+
+From this step we determinate:
+- **Registering metrics**: `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` for the Registering-only variant.
+## STEP 4: Reordering Technique
+I implement the **Reordering** variant: the shared `RCA32` adder is replaced by two dedicated 32-bit adders, `Adder32AC` (computing `A+C`) and `Adder32BD` (computing `B+D`), operating in parallel and unconditionally on every clock cycle. The correct sum is selected downstream via a 2-to-1 result multiplexer (`MUX_SUM`), driven directly by the `parity_check` output, before being registered on `Z_reg`.
+
+I repeat the same verification flow as `STEP 2`:
+- **Post-implementation simulation**: verify functional correctness.
+- **Synthesis/implementation reports**: extract `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` under the same `10ns` clock constraint.
+> _Note_: Reordering trades an increase in LUT usage (an additional 32-bit adder is instantiated) for a reduction in switching activity on the sum path, since each adder's inputs no longer depend on a possibly-glitchy operand-selection mux placed _before_ the addition.
+
+From this step we determinate:
+- **Reordering metrics**: `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` for the Reordering-only variant.
+## STEP 5: Combined Registering & Reordering
+I implement the **Registering & Reordering** variant, combining both techniques: the Reordering topology (`Adder32AC`, `Adder32BD`, `MUX_SUM`) with a registered selection signal and a pipeline stage enclosing the two dedicated adders, removing the glitch on the `MUX_SUM` select line observed when Reordering is applied alone.
+
+I repeat the same verification flow as `STEP 2`:
+- **Post-implementation simulation**: verify functional correctness.
+- **Synthesis/implementation reports**: extract `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` under the same `10ns` clock constraint.
+From this step we determinate:
+- **Registering & Reordering metrics**: `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` for the combined variant.
+## STEP 6: Cross-Configuration Comparison
+For **validating** the reproduced methodology, all four configurations (Baseline, Registering, Reordering, Registering & Reordering) are compared side by side under the standard `10ns` clock constraint, and the comparison is repeated under a tighter, high-performance clock constraint.
+
+The comparison focuses on:
+- **Resource usage trade-off**: LUT/FF overhead introduced by each technique relative to the baseline.
+- **Timing improvement**: `WNS` margin and `fmax` gain relative to the baseline.
+- **Dynamic power reduction**: relative reduction in `Logic`, `Signals`, and `Clock` power, and in total internal power, relative to the baseline.
+- **Consistency with the reference**: the extracted metrics are checked against the reference figures reported in the source PDF (Tables 2.1, 2.3-2.6) to confirm the replication is _quantitatively_ consistent, not only qualitatively.
+> _Note_: as observed in the reference, increasing the clock frequency is expected to shift the dominant dynamic power contributor from `Logic`/`Signals` power toward `Clock` power, particularly for the register-heavy variants (Registering, Registering & Reordering).
+
+From this step we determinate:
+- **Comparison summary**: a consolidated table of `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` across all four configurations and both clock campaigns, confirming that Registering and Reordering (individually and combined) reduce dynamic power dissipation and improve timing relative to the baseline, consistent with the reference results.
