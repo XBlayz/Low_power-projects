@@ -111,7 +111,7 @@ set saif_path [file join $reports_dir "activity.saif"]
 launch_simulation -mode post-implementation -type timing -simset [get_filesets sim_1]
 
 open_saif $saif_path
-log_saif [get_objects -r "${dut_instance_path}/*"]
+log_saif [get_objects]
 run -all
 close_saif
 
@@ -119,9 +119,8 @@ close_sim
 
 # --- Power report, using the post-implementation activity dump --------------
 open_run impl_1
-report_power -file [file join $reports_dir "power.rpt"] \
-              -saif $saif_path \
-              -saif_scope $dut_instance_path
+read_saif $saif_path
+report_power -file [file join $reports_dir "power.rpt"]
 
 puts "INFO: variant '$variant_name' @ ${clk_period_ns}ns done. \
       Reports written to $reports_dir"
