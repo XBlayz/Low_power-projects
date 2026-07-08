@@ -241,8 +241,33 @@ I repeat the same verification flow as `STEP 2`:
 - **Synthesis/implementation reports**: extract `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` under the same `10ns` clock constraint.
 From this step we determinate:
 - **Registering & Reordering metrics**: `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` for the combined variant.
-## STEP 6: Cross-Configuration Comparison
-For **validating** the reproduced methodology, all four configurations (Baseline, Registering, Reordering, Registering & Reordering) are compared side by side under the standard `10ns` clock constraint, and the comparison is repeated under a tighter, high-performance clock constraint.
+## STEP 6: Gated Inputs, Precomputing & Clock Gating (Isolated Reordering)
+The Reordering variant (`STEP 4`) trades pre-adder glitch elimination for redundant computation: `Adder32AC` and `Adder32BD` both switch every cycle, even though only one of the two sums is ever selected by `MUX_SUM`. This step removes that redundant switching cost while preserving Reordering's structural benefit, exploiting a property of the reference circuit: the selection signal `Z` depends only on `sel1`/`sel2` (via `AdderSel`/`Pattern`), **not** on the operands `A`, `B`, `C`, `D` — it is therefore available _independently_ of, and no later than, the operand path.
+
+I implement an **Isolated Reordering** variant on top of the `STEP 4` topology:
+- **Precomputing**: `Z` is derived exactly as in the Baseline/Reordering selection path, with no additional logic; it is simply consumed one pipeline stage earlier than the final `MUX_SUM` selection, as an operand-isolation control signal.
+- **Gated Inputs** (operand isolation): the operands feeding the non-selected adder branch (`Adder32AC` or `Adder32BD`, depending on `Z`) are gated (AND-masked) to a constant value before reaching the adder, so its ripple-carry chain does not toggle on operand transitions that will not be selected this cycle.
+- **Clock Gating**: the pipeline register capturing the non-selected branch's sum (the `E1_reg`/`F1_reg` equivalent for the discarded result) is driven with an explicit **clock enable (CE)**, tied to `Z`, so it does not clock in the discarded value.
+I repeat the same verification flow as `STEP 2`:
+- **Post-implementation simulation**: verify functional correctness (the gating logic must not alter the selected sum).
+- **Synthesis/implementation reports**: extract `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` under the same `10ns` clock constraint.
+> _Note_: on Xilinx FPGAs, clock gating is implemented via flip-flop clock-enable (`CE`) pins rather than literal gating of the clock net in fabric logic, which is discouraged due to skew and routing unpredictability; dedicated global/regional gated clock buffers (`BUFGCE`/`BUFHCE`) exist for coarser-grained gating but are not needed at this register granularity.
+
+From this step we determinate:
+- **Isolated Reordering metrics**: `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` for the Gated-Input/Precomputing/Clock-Gating variant, expected to approach Reordering's glitch-free timing behavior at a Logic/Signals power cost closer to the Registering variant (no redundant adder switching).
+## STEP 7 (Optional): Razor-Style Timing-Margin Verification
+> _Note_: this step is an **optional extension**, not a core deliverable of the project. It is pursued if time allows, after `STEP 1`-`STEP 6` are complete and validated.
+
+This step empirically verifies the **path mismatch** hypothesis discussed for the Baseline selection path (`AdderSel` `RCA8` → `Pattern` `parity_check` → `Z`): its combinational depth is assumed to dominate the delay mismatch responsible for the glitch on `sel_1` observed in `STEP 2`. Rather than relying solely on Vivado's static timing report, the actual timing margin on this path is measured in situ using a **Razor-style timing speculation** mechanism (Ernst et al., *Razor: A Low-Power Pipeline Based on Circuit-Level Timing Speculation*, MICRO 2003).
+
+- A `razor_reg` entity is implemented: a main register sampled on the nominal clock, paired with a **shadow latch** sampled on a phase-delayed clock (generated via a Clocking Wizard `MMCM`), and an `XOR` comparator raising an `error` flag when the two samples disagree.
+- `razor_reg` instruments the register at the end of the selection path (the `Z`-generating register fed by `AdderSel`/`Pattern`).
+- **Detection + correction**: on `error`, the affected pipeline stage is corrected via a bubble/replay of the mismatched selection value, rather than detection-only counting.
+- The clock constraint is swept beyond the static `fmax` extracted in `STEP 2`, measuring the empirical error rate per period and comparing the resulting real timing margin against the statically reported `WNS`.
+From this step we determinate (if pursued):
+- **Empirical timing margin**: a measured, per-frequency error rate on the selection path, quantifying how conservative Vivado's static `WNS`/`fmax` estimate is relative to the path's actual runtime timing behavior.
+## STEP 8: Cross-Configuration Comparison
+For **validating** the reproduced methodology, all configurations (Baseline, Registering, Reordering, Registering & Reordering, Isolated Reordering, and, if pursued, the Razor-augmented variant) are compared side by side under the standard `10ns` clock constraint, and the comparison is repeated under a tighter, high-performance clock constraint.
 
 The comparison focuses on:
 - **Resource usage trade-off**: LUT/FF overhead introduced by each technique relative to the baseline.
@@ -252,4 +277,4 @@ The comparison focuses on:
 > _Note_: as observed in the reference, increasing the clock frequency is expected to shift the dominant dynamic power contributor from `Logic`/`Signals` power toward `Clock` power, particularly for the register-heavy variants (Registering, Registering & Reordering).
 
 From this step we determinate:
-- **Comparison summary**: a consolidated table of `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` across all four configurations and both clock campaigns, confirming that Registering and Reordering (individually and combined) reduce dynamic power dissipation and improve timing relative to the baseline, consistent with the reference results.
+- **Comparison summary**: a consolidated table of `(LUT, FF, WNS, fmax, Logic/Signals/Clock power)` across all configurations and both clock campaigns, confirming that Registering, Reordering, and Isolated Reordering (individually and combined) reduce dynamic power dissipation and improve timing relative to the baseline, consistent with the reference results.
