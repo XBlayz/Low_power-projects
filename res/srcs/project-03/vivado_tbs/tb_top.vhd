@@ -85,13 +85,13 @@ architecture sim of tb_top is
     -- reduced low-bit entropy of naively scaling a single real draw to a
     -- wide integer range.
     -- --------------------------------------------------------------------
-    impure function rand_slv (
-        width  : positive;
-        seed1  : inout positive;
-        seed2  : inout positive
-    ) return std_logic_vector is
-        variable result : std_logic_vector(width - 1 downto 0);
-        variable r      : real;
+    procedure rand_slv (
+        constant width  : in  positive;
+        variable seed1  : inout positive;
+        variable seed2  : inout positive;
+        variable result : out std_logic_vector
+    ) is
+        variable r : real;
     begin
         for i in result'range loop
             uniform(seed1, seed2, r);
@@ -101,8 +101,7 @@ architecture sim of tb_top is
                 result(i) := '0';
             end if;
         end loop;
-        return result;
-    end function rand_slv;
+    end procedure rand_slv;
 
     -- --------------------------------------------------------------------
     -- xor_reduce_v: manual XOR-tree reduction, matching parity_check.vhd's
@@ -176,12 +175,12 @@ begin
 
         for i in 1 to NUM_TRANSACTIONS loop
 
-            a_v    := rand_slv(32, seed1_v, seed2_v);
-            b_v    := rand_slv(32, seed1_v, seed2_v);
-            c_v    := rand_slv(32, seed1_v, seed2_v);
-            d_v    := rand_slv(32, seed1_v, seed2_v);
-            sel1_v := rand_slv(8, seed1_v, seed2_v);
-            sel2_v := rand_slv(8, seed1_v, seed2_v);
+            rand_slv(32, seed1_v, seed2_v, a_v);
+            rand_slv(32, seed1_v, seed2_v, b_v);
+            rand_slv(32, seed1_v, seed2_v, c_v);
+            rand_slv(32, seed1_v, seed2_v, d_v);
+            rand_slv(8, seed1_v, seed2_v, sel1_v);
+            rand_slv(8, seed1_v, seed2_v, sel2_v);
 
             a    <= a_v;
             b    <= b_v;
@@ -237,7 +236,7 @@ begin
     check : process (clk) is
     begin
         if rising_edge(clk) then
-            if valid_pipeline(PIPELINE_LATENCY - 1) = '1' then
+            if valid_pipeline(PIPELINE_LATENCY) = '1' then
                 check_count <= check_count + 1;
                 if z /= expected_pipeline(PIPELINE_LATENCY - 1) then
                     error_count <= error_count + 1;
