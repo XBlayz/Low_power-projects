@@ -6,21 +6,28 @@
 ## architectural variant, at a given clock period.
 ##
 ## Usage:
-##   vivado -mode batch -source tcl/run_variant.tcl \
+##   vivado -mode batch -source scripts/project-03/run_variant.tcl \
 ##       -tclargs <variant_name> [clk_period_ns] [dut_instance_path]
 ##
 ## Examples:
-##   vivado -mode batch -source tcl/run_variant.tcl -tclargs baseline
-##   vivado -mode batch -source tcl/run_variant.tcl -tclargs registering 10.0
-##   vivado -mode batch -source tcl/run_variant.tcl -tclargs reordering 5.5
+##   vivado -mode batch -source scripts/project-03/run_variant.tcl -tclargs baseline
+##   vivado -mode batch -source scripts/project-03/run_variant.tcl -tclargs registering 10.0
+##   vivado -mode batch -source scripts/project-03/run_variant.tcl -tclargs reordering 5.5
 ##
-## Outputs (under reports/<variant>/):
+## Recommended invocation (captures the console/simulation log for the
+## Python notebook's STEP 1 functional-check parsing):
+##   vivado -mode batch \
+##       -log notebooks/output/project-03/sims/reports/<variant>/vivado_console_<clk_period_ns>ns.log \
+##       -source scripts/project-03/run_variant.tcl -tclargs <variant> <clk_period_ns>
+##
+## Outputs (under notebooks/output/project-03/sims/reports/<variant>/):
 ##   utilization.rpt, timing_summary.rpt, power.rpt, activity.saif
 ##
 ## ASSUMPTIONS (flagged pending STEP 1 / testbench deliverable):
-##   - tb/tb_top.vhd exists (entity tb_top, architecture sim) and
-##     self-terminates the simulation (VHDL-2008 std.env.stop), so
-##     `run -all` completes without an explicit sim_time argument.
+##   - res/src/project-03/vivado_tbs/tb_top.vhd exists (entity tb_top,
+##     architecture sim) and self-terminates the simulation (VHDL-2008
+##     std.env.stop), so `run -all` completes without an explicit
+##     sim_time argument.
 ##   - the DUT is instantiated in tb_top under instance name `dut`. The
 ##     active simulation top is a `configuration` (cfg_baseline,
 ##     cfg_registering, ...), set per variant by select_variant; xsim's
@@ -41,8 +48,14 @@ if {$clk_period_ns eq ""} { set clk_period_ns 10.0 }
 if {$dut_instance_path eq ""} { set dut_instance_path "/tb_top/dut" }
 
 # --- Paths --------------------------------------------------------------
-set script_dir    [file normalize [file dirname [info script]]]
-set project_root  [file normalize [file join $script_dir ".."]]
+# This script lives at <repo_root>/scripts/project-03/, two levels below
+# the repo root.
+set script_dir [file normalize [file dirname [info script]]]
+set repo_root  [file normalize [file join $script_dir ".." ".."]]
+
+set sims_dir     [file join $repo_root "notebooks" "output" "project-03" "sims"]
+set project_root [file join $sims_dir "vivado_project"]
+set reports_root [file join $sims_dir "reports"]
 set xpr_path      [file join $project_root "project-03.xpr"]
 
 source [file join $script_dir "variants.tcl"]
@@ -62,7 +75,7 @@ lassign $variant_info top_entity vhd_file report_subfolder sim_configuration pip
 set ::clk_period_ns $clk_period_ns
 puts "INFO: clk_period_ns = $::clk_period_ns"
 
-set reports_dir [file join $project_root "reports" $report_subfolder]
+set reports_dir [file join $reports_root $report_subfolder]
 file mkdir $reports_dir
 
 # --- Helper: abort on run failure --------------------------------------------

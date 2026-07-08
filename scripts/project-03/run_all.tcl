@@ -10,14 +10,17 @@
 ##
 ## Usage (run from an OS shell with `vivado` on PATH, NOT from within an
 ## interactive Vivado Tcl console):
-##   vivado -mode batch -source tcl/run_all.tcl
+##   vivado -mode batch -source scripts/project-03/run_all.tcl
 ##
 ## A run failing does not abort the sweep: it is logged and the next
 ## combination is attempted, so a single bad variant does not block the
 ## rest of the comparison.
 ## --------------------------------------------------------------------------
 
+# This script lives at <repo_root>/scripts/project-03/, two levels below
+# the repo root.
 set script_dir [file normalize [file dirname [info script]]]
+set repo_root  [file normalize [file join $script_dir ".." ".."]]
 
 source [file join $script_dir "variants.tcl"]
 
@@ -32,17 +35,25 @@ set HIGH_PERF_CLK_NS 6.0
 set clock_campaigns [list $STANDARD_CLK_NS $HIGH_PERF_CLK_NS]
 
 set run_variant_script [file join $script_dir "run_variant.tcl"]
+set reports_root       [file join $repo_root "notebooks" "output" "project-03" "sims" "reports"]
 
 set failures {}
 
 foreach variant_name [array names ::VARIANTS] {
+    lassign $::VARIANTS($variant_name) top_entity vhd_file report_subfolder sim_configuration pipeline_latency
+    set reports_dir [file join $reports_root $report_subfolder]
+    file mkdir $reports_dir
+
     foreach clk_period_ns $clock_campaigns {
+        set console_log [file join $reports_dir "vivado_console_${clk_period_ns}ns.log"]
+
         puts "\n===================================================================="
         puts "INFO: running variant='$variant_name'  clk_period_ns=$clk_period_ns"
+        puts "console log -> $console_log"
         puts "====================================================================\n"
 
         set exit_status [catch {
-            exec vivado -mode batch -source $run_variant_script \
+            exec vivado -mode batch -log $console_log -source $run_variant_script \
                 -tclargs $variant_name $clk_period_ns \
                 >&@stdout
         } result]
