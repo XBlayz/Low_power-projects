@@ -4,7 +4,7 @@
 -- Combines Reordering (dual dedicated adders, Adder32AC/Adder32BD) with
 -- Registering (Pitingolo, Fig. 2.9): a second register stage (A2/B2/C2/D2_reg)
 -- feeds the two adders, and their outputs are registered (E1_reg, F1_reg)
--- *before* MUX_SUM. Since the selected sum now arrives two register stages
+-- before MUX_SUM. Since the selected sum now arrives two register stages
 -- after the initial capture (stage 1 -> stage 2 -> adder -> E1_reg/F1_reg),
 -- the selection signal is re-aligned through two cascaded registers
 -- (sel1_2_reg, sel1_3_reg) so MUX_SUM's select and its two data inputs are
