@@ -131,6 +131,8 @@ report_timing_summary -file [file join $reports_dir "timing_summary.rpt"] -max_p
 set_property -name {xsim.simulate.saif} -value {sim.saif} -objects [get_filesets sim_1]
 set_property -name {xsim.simulate.saif_all_signals} -value {true} -objects [get_filesets sim_1]
 
+set_property target_language VHDL [current_project]
+
 launch_simulation -mode post-implementation -type timing -simset [get_filesets sim_1]
 run -all
 close_sim
