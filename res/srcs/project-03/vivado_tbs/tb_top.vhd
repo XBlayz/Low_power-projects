@@ -63,9 +63,9 @@ architecture sim of tb_top is
 
     -- reference pipeline: shift register of expected Z values, depth
     -- PIPELINE_LATENCY, self-aligning the check to each variant's latency
-    type z_pipeline_t is array (0 to PIPELINE_LATENCY - 1) of std_logic_vector(32 downto 0);
-    signal expected_pipeline : z_pipeline_t                         := (others => (others => '0'));
-    signal valid_pipeline    : std_logic_vector(0 to PIPELINE_LATENCY - 1) := (others => '0');
+    type z_pipeline_t is array (0 to PIPELINE_LATENCY) of std_logic_vector(32 downto 0);
+    signal expected_pipeline : z_pipeline_t                            := (others => (others => '0'));
+    signal valid_pipeline    : std_logic_vector(0 to PIPELINE_LATENCY) := (others => '0');
 
     signal check_count : natural := 0;
     signal error_count  : natural := 0;
@@ -154,6 +154,7 @@ begin
     rst_gen : process is
     begin
         rst <= '1';
+        wait for 100 ns;
         wait for CLK_PERIOD * 4;
         rst <= '0';
         wait;
@@ -203,8 +204,8 @@ begin
                 expected_v := resize(unsigned(b_v), 33) + resize(unsigned(d_v), 33);
             end if;
 
-            expected_pipeline <= std_logic_vector(expected_v) & expected_pipeline(0 to PIPELINE_LATENCY - 2);
-            valid_pipeline    <= '1' & valid_pipeline(0 to PIPELINE_LATENCY - 2);
+            expected_pipeline <= std_logic_vector(expected_v) & expected_pipeline(0 to PIPELINE_LATENCY - 1);
+            valid_pipeline    <= '1' & valid_pipeline(0 to PIPELINE_LATENCY - 1);
 
             wait until rising_edge(clk);
 
@@ -212,20 +213,21 @@ begin
 
         -- drain: let the pipeline flush before ending the simulation
         for i in 1 to PIPELINE_LATENCY + 2 loop
-            valid_pipeline <= '0' & valid_pipeline(0 to PIPELINE_LATENCY - 2);
+            expected_pipeline <= expected_pipeline(0) & expected_pipeline(0 to PIPELINE_LATENCY - 1);
+            valid_pipeline    <= '0' & valid_pipeline(0 to PIPELINE_LATENCY - 1);
             wait until rising_edge(clk);
         end loop;
 
         sim_done <= true;
 
-        report "TB_TOP: " & integer'image(check_count) & " checks, " &
+        report "INFO: [TB] " & integer'image(check_count) & " checks, " &
                integer'image(error_count) & " errors."
                severity note;
 
         if error_count = 0 then
-            report "TB_TOP: PASS" severity note;
+            report "INFO: [TB] PASS" severity note;
         else
-            report "TB_TOP: FAIL" severity error;
+            report "ERROR: [TB] FAIL" severity error;
         end if;
 
         std.env.stop;
@@ -239,14 +241,21 @@ begin
     check : process (clk) is
     begin
         if rising_edge(clk) then
-            if valid_pipeline(PIPELINE_LATENCY - 1) = '1' then
+            -- 4. Controllo eseguito al ciclo corretto (PIPELINE_LATENCY)
+            if valid_pipeline(PIPELINE_LATENCY) = '1' then
                 check_count <= check_count + 1;
-                if z /= expected_pipeline(PIPELINE_LATENCY - 1) then
+
+                if z /= expected_pipeline(PIPELINE_LATENCY) then
                     error_count <= error_count + 1;
-                    report "TB_TOP: MISMATCH at check " & integer'image(check_count) &
-                           " : expected=" & to_hstring(expected_pipeline(PIPELINE_LATENCY - 1)) &
+                    report "ERROR: [TB] MISMATCH at check " & integer'image(check_count) &
+                           " : expected=" & to_hstring(expected_pipeline(PIPELINE_LATENCY)) &
                            " got=" & to_hstring(z)
                            severity error;
+                else
+                    report "INFO: [TB] MATCH at check " & integer'image(check_count) &
+                           " : expected=" & to_hstring(expected_pipeline(PIPELINE_LATENCY)) &
+                           " got=" & to_hstring(z)
+                           severity note;
                 end if;
             end if;
         end if;
