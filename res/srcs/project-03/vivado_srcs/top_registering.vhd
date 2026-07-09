@@ -41,7 +41,7 @@ architecture rtl of top_registering is
         );
     end component rtl_reg_sync;
 
-    component rca_gen is
+    component rca is
         generic (
             WIDTH : positive
         );
@@ -50,7 +50,7 @@ architecture rtl of top_registering is
             b   : in  std_logic_vector(WIDTH - 1 downto 0);
             sum : out std_logic_vector(WIDTH downto 0)
         );
-    end component rca_gen;
+    end component rca;
 
     component parity_check is
         generic (
@@ -114,7 +114,7 @@ begin
     -- (parity_check) -> sel_z
     ------------------------------------------------------------------
 
-    adder_sel : rca_gen
+    adder_sel : rca
         generic map (WIDTH => 8)
         port map (a => sel1_1_reg, b => sel2_1_reg, sum => sel_sum);
 
@@ -162,7 +162,7 @@ begin
     -- Addition: Adder32EF
     ------------------------------------------------------------------
 
-    adder_32ef : rca_gen
+    adder_32ef : rca
         generic map (WIDTH => 32)
         port map (a => e1_reg, b => f1_reg, sum => adder_sum);
 

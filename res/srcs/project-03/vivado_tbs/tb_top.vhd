@@ -35,32 +35,23 @@ use std.env.all;
 
 entity tb_top is
     generic (
-        PIPELINE_LATENCY : positive := 2;     -- cycles from input capture to Z valid; set per variant
-        NUM_TRANSACTIONS  : positive := 200;  -- random stimulus vectors to apply
+        PIPELINE_LATENCY  : positive := 2;      -- cycles from input capture to Z valid; set per variant
+        VARIANT_ID        : natural  := 0;      -- 0: baseline, 1: registering, etc.
+        NUM_TRANSACTIONS  : positive := 200;    -- random stimulus vectors to apply
         CLK_PERIOD        : time     := 10 ns;
-        RAND_SEED_1        : positive := 1;
-        RAND_SEED_2        : positive := 1
+        RAND_SEED_1       : positive := 1;
+        RAND_SEED_2       : positive := 1
     );
 end entity tb_top;
 
 architecture sim of tb_top is
 
-    -- generic DUT interface: matches every top_*.vhd entity's port list
-    -- exactly; the concrete binding is resolved by the active
-    -- `configuration`, not by this declaration.
-    component dut_if is
-        port (
-            clk  : in  std_logic;
-            rst  : in  std_logic;
-            a    : in  std_logic_vector(31 downto 0);
-            b    : in  std_logic_vector(31 downto 0);
-            c    : in  std_logic_vector(31 downto 0);
-            d    : in  std_logic_vector(31 downto 0);
-            sel1 : in  std_logic_vector(7 downto 0);
-            sel2 : in  std_logic_vector(7 downto 0);
-            z    : out std_logic_vector(32 downto 0)
-        );
-    end component dut_if;
+    -- DTU instantiations
+    component top_baseline is port (clk: in std_logic; rst: in std_logic; a,b,c,d: in std_logic_vector(31 downto 0); sel1,sel2: in std_logic_vector(7 downto 0); z: out std_logic_vector(32 downto 0)); end component;
+    component top_registering is port (clk: in std_logic; rst: in std_logic; a,b,c,d: in std_logic_vector(31 downto 0); sel1,sel2: in std_logic_vector(7 downto 0); z: out std_logic_vector(32 downto 0)); end component;
+    component top_reordering is port (clk: in std_logic; rst: in std_logic; a,b,c,d: in std_logic_vector(31 downto 0); sel1,sel2: in std_logic_vector(7 downto 0); z: out std_logic_vector(32 downto 0)); end component;
+    component top_reordering_registering is port (clk: in std_logic; rst: in std_logic; a,b,c,d: in std_logic_vector(31 downto 0); sel1,sel2: in std_logic_vector(7 downto 0); z: out std_logic_vector(32 downto 0)); end component;
+    component top_isolated_reordering is port (clk: in std_logic; rst: in std_logic; a,b,c,d: in std_logic_vector(31 downto 0); sel1,sel2: in std_logic_vector(7 downto 0); z: out std_logic_vector(32 downto 0)); end component;
 
     signal clk        : std_logic := '0';
     signal rst         : std_logic := '1';
@@ -123,13 +114,25 @@ begin
     -- DUT instance (entity binding resolved by the active
     -- `configuration`)
     ------------------------------------------------------------------
-    dut : dut_if
-        port map (
-            clk => clk, rst => rst,
-            a => a, b => b, c => c, d => d,
-            sel1 => sel1, sel2 => sel2,
-            z => z
-        );
+    gen_base: if VARIANT_ID = 0 generate
+        dut: top_baseline port map (clk=>clk, rst=>rst, a=>a, b=>b, c=>c, d=>d, sel1=>sel1, sel2=>sel2, z=>z);
+    end generate;
+
+    gen_reg: if VARIANT_ID = 1 generate
+        dut: top_registering port map (clk=>clk, rst=>rst, a=>a, b=>b, c=>c, d=>d, sel1=>sel1, sel2=>sel2, z=>z);
+    end generate;
+
+    gen_reord: if VARIANT_ID = 2 generate
+        dut: top_reordering port map (clk=>clk, rst=>rst, a=>a, b=>b, c=>c, d=>d, sel1=>sel1, sel2=>sel2, z=>z);
+    end generate;
+
+    gen_reord_reg: if VARIANT_ID = 3 generate
+        dut: top_reordering_registering port map (clk=>clk, rst=>rst, a=>a, b=>b, c=>c, d=>d, sel1=>sel1, sel2=>sel2, z=>z);
+    end generate;
+
+    gen_isol: if VARIANT_ID = 4 generate
+        dut: top_isolated_reordering port map (clk=>clk, rst=>rst, a=>a, b=>b, c=>c, d=>d, sel1=>sel1, sel2=>sel2, z=>z);
+    end generate;
 
     ------------------------------------------------------------------
     -- Clock generation
@@ -236,7 +239,7 @@ begin
     check : process (clk) is
     begin
         if rising_edge(clk) then
-            if valid_pipeline(PIPELINE_LATENCY) = '1' then
+            if valid_pipeline(PIPELINE_LATENCY - 1) = '1' then
                 check_count <= check_count + 1;
                 if z /= expected_pipeline(PIPELINE_LATENCY - 1) then
                     error_count <= error_count + 1;
@@ -250,50 +253,3 @@ begin
     end process check;
 
 end architecture sim;
-
---------------------------------------------------------------------------------
--- Configurations: one per architectural variant, binding the `dut`
--- component instance to the concrete top-level entity. Select the active
--- configuration as the simulation top per variant (see
--- tcl/variants.tcl / select_variant), instead of editing this file.
---------------------------------------------------------------------------------
-
-configuration cfg_baseline of tb_top is
-    for sim
-        for dut : dut_if
-            use entity work.top_baseline(rtl);
-        end for;
-    end for;
-end configuration cfg_baseline;
-
-configuration cfg_registering of tb_top is
-    for sim
-        for dut : dut_if
-            use entity work.top_registering(rtl);
-        end for;
-    end for;
-end configuration cfg_registering;
-
-configuration cfg_reordering of tb_top is
-    for sim
-        for dut : dut_if
-            use entity work.top_reordering(rtl);
-        end for;
-    end for;
-end configuration cfg_reordering;
-
-configuration cfg_reordering_registering of tb_top is
-    for sim
-        for dut : dut_if
-            use entity work.top_reordering_registering(rtl);
-        end for;
-    end for;
-end configuration cfg_reordering_registering;
-
-configuration cfg_isolated_reordering of tb_top is
-    for sim
-        for dut : dut_if
-            use entity work.top_isolated_reordering(rtl);
-        end for;
-    end for;
-end configuration cfg_isolated_reordering;

@@ -54,7 +54,7 @@ architecture rtl of top_isolated_reordering is
         );
     end component rtl_reg_sync;
 
-    component rca_gen is
+    component rca is
         generic (
             WIDTH : positive
         );
@@ -63,7 +63,7 @@ architecture rtl of top_isolated_reordering is
             b   : in  std_logic_vector(WIDTH - 1 downto 0);
             sum : out std_logic_vector(WIDTH downto 0)
         );
-    end component rca_gen;
+    end component rca;
 
     component parity_check is
         generic (
@@ -155,7 +155,7 @@ begin
     -- Pattern (parity_check) -> sel_z
     ------------------------------------------------------------------
 
-    adder_sel : rca_gen
+    adder_sel : rca
         generic map (WIDTH => 8)
         port map (a => sel1_1_reg, b => sel2_1_reg, sum => sel_sum);
 
@@ -193,11 +193,11 @@ begin
     -- chain toggles meaningfully
     ------------------------------------------------------------------
 
-    adder_32ac : rca_gen
+    adder_32ac : rca
         generic map (WIDTH => 32)
         port map (a => gated_a, b => gated_c, sum => sum_ac);
 
-    adder_32bd : rca_gen
+    adder_32bd : rca
         generic map (WIDTH => 32)
         port map (a => gated_b, b => gated_d, sum => sum_bd);
 
