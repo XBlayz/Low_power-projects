@@ -28,14 +28,36 @@
 ##     architecture sim) and self-terminates the simulation (VHDL-2008
 ##     std.env.stop), so `run -all` completes without an explicit
 ##     sim_time argument.
-##   - the DUT is instantiated in tb_top under instance name `dut`. The
-##     active simulation top is a `configuration` (cfg_baseline,
-##     cfg_registering, ...), set per variant by select_variant; xsim's
-##     reported hierarchy path for `dut` may be rooted at the
-##     configuration name rather than at `tb_top` depending on tool
-##     behavior. dut_instance_path defaults to `/tb_top/dut`; verify the
-##     actual path in the first simulation run's waveform/log and override
-##     via the third tclarg if it differs (e.g. `/cfg_baseline/dut`).
+##   - the DUT is instantiated in tb_top under instance label `dut`
+##     (`dut : dut_if port map (...)`). `log_saif [get_objects]` logs the
+##     entire visible hierarchy from the simulation's current scope, so no
+##     path is needed there.
+##   - `report_power` has NO `-saif`/`-saif_scope` option (confirmed via
+##     `report_power -help`): activity must be loaded beforehand via the
+##     separate `read_saif` command, which then annotates the design nodes
+##     for the next `report_power` call.
+##   - `read_saif` has NO `-scope` option either (confirmed via
+##     `read_saif -help`): the relevant option is `-strip_path <arg>`,
+##     which strips the given instance path PREFIX (no leading '/') from
+##     the SAIF's recorded net names so they map onto the currently open
+##     design (`open_run impl_1`, rooted at the DUT's own top-level entity,
+##     e.g. top_baseline). Without any `-strip_path`, `read_saif` strips
+##     the SAIF's first TWO hierarchy levels automatically (`-no_strip`
+##     disables that default). If the assumed depth (testbench scope +
+##     `dut` instance = 2 levels) does not match how the simulator actually
+##     recorded the hierarchy for a `configuration`-based simulation top,
+##     nets fail to correlate and report_power silently falls back to
+##     vectorless estimation for most nodes (LOW confidence, not HIGH).
+##   - dut_instance_path defaults to `dut` (tried with `-no_strip`, i.e.
+##     assuming the configuration collapses away the outer testbench scope
+##     and `dut` is the sole prefix to strip). `-out_file` captures any
+##     nets that failed to match during read_saif -- inspect
+##     saif_unmatched.log after a run; a non-empty file means the prefix is
+##     wrong, and its contents show the actual recorded net paths, which
+##     tell you what to pass instead via the third tclarg (e.g. `tb_top/dut`
+##     if the default 2-level auto-strip, without `-no_strip`, turns out to
+##     be the correct one after all -- try that combination too if `dut`
+##     alone does not resolve LOW confidence).
 ## --------------------------------------------------------------------------
 
 # --- Arguments --------------------------------------------------------------
@@ -45,7 +67,7 @@ if {[llength $argv] < 1} {
 lassign $argv variant_name clk_period_ns dut_instance_path
 
 if {$clk_period_ns eq ""} { set clk_period_ns 10.0 }
-if {$dut_instance_path eq ""} { set dut_instance_path "/tb_top/dut" }
+if {$dut_instance_path eq ""} { set dut_instance_path "dut" }
 
 # --- Paths --------------------------------------------------------------
 # This script lives at <repo_root>/scripts/project-03/, two levels below
@@ -106,21 +128,20 @@ report_utilization    -file [file join $reports_dir "utilization.rpt"]
 report_timing_summary -file [file join $reports_dir "timing_summary.rpt"] -max_paths 10
 
 # --- Post-implementation timing simulation: SAIF activity dump --------------
-set saif_path [file join $reports_dir "activity.saif"]
+set_property -name {xsim.simulate.saif} -value {sim.saif} -objects [get_filesets sim_1]
+set_property -name {xsim.simulate.saif_all_signals} -value {true} -objects [get_filesets sim_1]
 
 launch_simulation -mode post-implementation -type timing -simset [get_filesets sim_1]
-
-open_saif $saif_path
-log_saif [get_objects]
 run -all
-close_saif
-
 close_sim
 
 # --- Power report, using the post-implementation activity dump --------------
 open_run impl_1
-read_saif $saif_path
-report_power -file [file join $reports_dir "power.rpt"]
+
+set_load 5 [all_outputs]
+read_saif {C:/Users/stefa/Workspace/01-UNICAL/Low_power-projects/notebooks/output/project-03/sims/vivado_project/project-03.sim/sim_1/impl/timing/xsim/sim.saif}
+
+report_power -file [file join $reports_dir "power.rpt"] -xpe [file join $reports_dir "power.xpe"]
 
 puts "INFO: variant '$variant_name' @ ${clk_period_ns}ns done. \
       Reports written to $reports_dir"
