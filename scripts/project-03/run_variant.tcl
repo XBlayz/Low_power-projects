@@ -143,9 +143,9 @@ set saif_filename "activity.saif"
 set_property -name {xsim.simulate.saif}             -value $saif_filename -objects [get_filesets sim_1]
 set_property -name {xsim.simulate.saif_all_signals} -value {true}        -objects [get_filesets sim_1]
 
+set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets sim_1]
+
 launch_simulation -mode post-implementation -type timing -simset [get_filesets sim_1]
-run -all
-close_sim
 
 set saif_path [file join $project_root "project-03.sim" "sim_1" "impl" "timing" "xsim" $saif_filename]
 

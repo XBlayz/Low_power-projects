@@ -15,15 +15,8 @@ set "VARIANTS=%~2"
 :: Definizione dei path assoluti
 set "ROOT_DIR=C:\Users\stefa\Workspace\01-UNICAL\Low_power-projects"
 set "TCL_SCRIPT=%ROOT_DIR%\scripts\project-03\run_variant.tcl"
-set "LOGS_DIR=%ROOT_DIR%\notebooks\output\project-03\sims\logs"
-
-:: Spostamento nella directory relativa di lavoro
-pushd .\notebooks\output\project-03\sims\
-if %errorlevel% neq 0 (
-    echo [ERRORE] Impossibile trovare la directory .\notebooks\output\project-03\sims\
-    echo Assicurati di lanciare lo script dalla root del progetto.
-    exit /b 1
-)
+set "WORK_DIR=%ROOT_DIR%\notebooks\output\project-03\sims"
+set "LOGS_DIR=%WORK_DIR%\logs"
 
 :: Creazione della cartella logs se non esiste
 if not exist "%LOGS_DIR%" (
@@ -39,11 +32,17 @@ for %%V in (%VARIANTS%) do (
 
         set "LOG_FILE=%LOGS_DIR%\%%V_%%Cns.log"
 
-        vivado -mode batch -log "!LOG_FILE!" -source "%TCL_SCRIPT%" -tclargs %%V %%C
+        :: FORZA lo spostamento nella directory corretta prima di ogni iterazione
+        pushd "%WORK_DIR%"
+
+        :: Usa rigorosamente CALL per richiamare Vivado (.bat) senza rompere il loop
+        call vivado -mode batch -log "!LOG_FILE!" -source "%TCL_SCRIPT%" -tclargs %%V %%C
+
+        :: Ritorna alla root in modo sicuro alla fine dell'iterazione
+        popd
+        echo.
     )
 )
 
-:: Ritorno alla directory originale
-popd
 echo [INFO] Tutte le simulazioni sono state elaborate.
 endlocal
