@@ -14,9 +14,4 @@
 ## generation. Add them here once a target board is chosen and hardware
 ## bring-up / bitstream generation is needed.
 ## --------------------------------------------------------------------------
-
-if {![info exists ::clk_period_ns]} {
-    set ::clk_period_ns 10.0
-}
-
-create_clock -period $::clk_period_ns -name clk [get_ports clk]
+create_clock -period 10.0 -name clk [get_ports clk]
